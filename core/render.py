@@ -722,6 +722,22 @@ def draw_wireframe_with_depth(
     return None
 
 
+def compute_vertice_uv(image: np.ndarray, mesh: Mesh.Mesh, modelview: np.ndarray, projection: np.ndarray, viewport: np.ndarray,
+        scale: Optional[float] = 1.0,):
+
+    result = list()
+
+    width = float(image.shape[1])
+    height = float(image.shape[0])
+
+    for vertice in mesh.vertices:
+        p = glm.project(vertice, modelview, projection, viewport)[:2] * scale
+        u = p[0] / width
+        v = 1 - (p[1] / height)
+        result.append([u, v])
+
+    return result
+
 def save_ply(mesh: Mesh.Mesh, path: str, color: Optional[List] = list([255, 255, 255]),
              author: Optional[str] = 'Unknown') -> None:
     print(path)
@@ -751,6 +767,44 @@ def save_ply(mesh: Mesh.Mesh, path: str, color: Optional[List] = list([255, 255,
     for vertices in mesh.vertices:
         lines += str(vertices).replace('[', '').replace(']', '').strip()
         lines += color_str
+
+    for coor in mesh.tvi:
+        lines += '3 '
+        lines += str(coor).strip('[]').replace(',', '')
+        lines += '\n'
+    ply.write(lines)
+    ply.close()
+    return None
+
+
+def save_ply_texture(mesh: Mesh.Mesh, path: str, textureFile: str, uvList: List, author: Optional[str] = 'Unknown') -> None:
+    print(path)
+    assert(len(mesh.vertices) == len(uvList), "Different length of vertices and uv values")
+    num_vertex = len(mesh.vertices)
+    num_face = len(mesh.tvi)
+    basename = os.path.basename(path)
+
+    ply = open(path + '.ply', 'w')
+    ply.write('ply\n')
+    ply.write('format ascii 1.0\n')
+    ply.write('comment TextureFile ' + textureFile + '\n')
+    ply.write('comment author: ' + author + '\n')
+    ply.write('comment object: ' + basename + '\n')
+    ply.write('element vertex ' + str(num_vertex) + '\n')
+    ply.write('property float x\n')
+    ply.write('property float y\n')
+    ply.write('property float z\n')
+    ply.write('property float texture_u\n')
+    ply.write('property float texture_v\n')
+    ply.write('element face ' + str(num_face) + '\n')
+    ply.write('property list uchar int vertex_indices\n')
+    ply.write('end_header\n')
+
+    lines = ''
+    for idx, vertices in enumerate(mesh.vertices):
+        lines += str(vertices).replace('[', '').replace(']', '').strip()
+        uv = uvList[idx]
+        lines += ' ' + str(uv[0]) + ' ' + str(uv[1]) + '\n'
 
     for coor in mesh.tvi:
         lines += '3 '
